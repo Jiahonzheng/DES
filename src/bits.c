@@ -10,7 +10,7 @@ uint64_t to_uint64(char* data) {
 
 int get_bit(uint64_t data, int bit) { return (data >> bit) & 1; }
 
-void to_char(uint64_t data, char* c) {
+void to_bit(uint64_t data, char* c) {
   for (int i = 0; i < 8; ++i) {
     c[i] = (data >> ((7 - i) * 8)) & ODD_PARITY;
   }

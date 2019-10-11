@@ -17,7 +17,7 @@ uint64_t generate_des_key() {
 
 bool verify_des_key(uint64_t key) {
   char c[8];
-  to_char(key, c);
+  to_bit(key, c);
   for (int i = 0; i < 8; ++i) {
     if (count_bits(c[i], 0xFF) % 2 != 1) {
       return false;
@@ -65,7 +65,73 @@ uint64_t calc_sbox(uint64_t data) {
   return ret;
 }
 
-uint64_t des(uint64_t chunk, uint64_t key, int mode) {
+void _des(int mode, uint64_t key, char* read_chunk, char* write_chunk,
+          FILE* output_file) {
+  uint64_t ret = des_block(to_uint64(read_chunk), key, mode);
+  to_bit(ret, write_chunk);
+  fwrite(write_chunk, sizeof(uint8_t), 8, output_file);
+}
+
+int des(int mode, char* key_fname, char* input_fname, char* output_fname) {
+  FILE* key_file = fopen(key_fname, "rb");
+  char key_bits[8];
+  if (key_file == NULL ||
+      fread(key_bits, sizeof(uint8_t), KEY_SIZE, key_file) != KEY_SIZE) {
+    return -1;
+  }
+  fclose(key_file);
+  uint64_t key = to_uint64(key_bits);
+  if (verify_des_key(key) == false) {
+    return -1;
+  }
+
+  FILE* input_file = fopen(input_fname, "rb");
+  if (input_file == NULL) {
+    return -1;
+  }
+  fseek(input_file, 0, SEEK_END);
+  long input_len = ftell(input_file);
+  fseek(input_file, 0, SEEK_SET);
+  printf("%s %ld\n", input_fname, input_len);
+
+  FILE* output_file = fopen(output_fname, "wb+");
+  if (output_file == NULL) {
+    return -1;
+  }
+
+  char read_chunk[8];
+  char write_chunk[8];
+  size_t read_chunk_len;
+  while ((read_chunk_len = fread(read_chunk, sizeof(uint8_t), 8, input_file))) {
+    input_len -= read_chunk_len;
+
+    _des(mode, key, read_chunk, write_chunk, output_file);
+
+    if (mode == ENCRYPT_MODE && input_len < 8) {
+      fread(read_chunk, sizeof(uint8_t), 8, input_file);
+      for (int i = input_len; i < 8; i++) {
+        read_chunk[i] = input_len;
+      }
+      _des(ENCRYPT_MODE, key, read_chunk, write_chunk, output_file);
+      break;
+    }
+
+    if (mode == DECRYPT_MODE && input_len == 8) {
+      fread(read_chunk, sizeof(uint8_t), 8, input_file);
+      int times = read_chunk[7] & 0x9;
+      uint64_t ret = des_block(to_uint64(read_chunk), key, DECRYPT_MODE);
+      to_bit(ret, write_chunk);
+      fwrite(write_chunk, sizeof(uint8_t), 8 - times, output_file);
+      break;
+    }
+  }
+
+  fclose(input_file);
+  fclose(output_file);
+  return 1;
+}
+
+uint64_t des_block(uint64_t chunk, uint64_t key, int mode) {
   uint64_t init_perm_res = do_permutation(IP, 64, 64, chunk);
   uint32_t L = (uint32_t)(init_perm_res >> 32) & L64_MASK;
   uint32_t R = (uint32_t)init_perm_res & L64_MASK;
@@ -100,10 +166,14 @@ void validate_des() {
   uint64_t result = 0xa7f1d92a83c8d9fe;
   uint64_t key = 0xa7f1d92a83c8d9fe;
 
-  uint64_t e = des(result, key, ENCRYPT_MODE);
+  // des(ENCRYPT_MODE, "key", "plain", "encrypted");
+
+  des(DECRYPT_MODE, "key", "encrypted1", "decrypted");
+
+  uint64_t e = des_block(result, key, ENCRYPT_MODE);
   printf("key: %016llx\n", key);
   printf("plain: %016llx\n", result);
   printf("encrypted: %016llx\n", e);
-  printf("%016llX\n", des(e, key, DECRYPT_MODE));
+  printf("%016llX\n", des_block(e, key, DECRYPT_MODE));
   return;
 }

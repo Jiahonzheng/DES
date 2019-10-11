@@ -8,7 +8,7 @@
 
 uint64_t to_uint64(char *data);
 
-void to_char(uint64_t data, char *c);
+void to_bit(uint64_t data, char *c);
 
 int get_bit(uint64_t data, int bit);
 
