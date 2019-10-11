@@ -2,6 +2,6 @@
 #include "des.h"
 
 int main(int argc, char* argv[]) {
-  printf("Hello World\n");
+  validate_des();
   return 0;
 }
