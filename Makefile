@@ -18,3 +18,36 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 
 clean:
 	@rm -rf bin/*
+
+test:
+	@echo "Clean the previous binary build."
+	@make clean
+
+	@echo "\nBuild the new binary."
+	@make
+
+	@echo "\nGenerate a key."
+	@./bin/des keygen key
+	@echo "The hexdump of the key:"
+	@hexdump key
+
+	@echo "\nGenerate a plain file."
+	@hexdump key > plain
+	@echo "The hexdump of the plain file:"
+	@hexdump plain
+
+	@echo "\nEncrypt the plain file with the key."
+	@./bin/des encrypt key plain encrypted
+	@echo "The hexdump of the encrypted file:"
+	@hexdump encrypted
+
+	@echo "\nDecrypt the encrypted file with the key."
+	@./bin/des decrypt key encrypted decrypted
+	@echo "The hexdump of the decrypted file:"
+	@hexdump decrypted
+
+	@echo "\nThe difference between the plain file and the decrypted file:"
+	@diff plain decrypted
+
+	@echo "\nClean the testing files."
+	@rm -f key plain encrypted decrypted
