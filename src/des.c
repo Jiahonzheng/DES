@@ -46,7 +46,8 @@ void calc_subkeys(uint64_t key, uint64_t* subkeys) {
     uint64_t permuted_choice_2 = (((uint64_t)C) << 28) | (uint64_t)D;
     subkeys[i] = 0;
     for (int j = 0; j < 48; ++j) {
-      subkeys[i] = (subkeys[i] << 1) | ((permuted_choice_2 >> (56 - PC2[j])) & 1);
+      subkeys[i] =
+          (subkeys[i] << 1) | ((permuted_choice_2 >> (56 - PC2[j])) & 1);
     }
   }
 }
@@ -78,17 +79,20 @@ int des(int mode, char* key_fname, char* input_fname, char* output_fname) {
   char key_bits[8];
   if (key_file == NULL ||
       fread(key_bits, sizeof(uint8_t), KEY_SIZE, key_file) != KEY_SIZE) {
-    return -1;
+    fprintf(stderr, "Unable to read key file %s.\n", key_fname);
+    exit(-1);
   }
   fclose(key_file);
   uint64_t key = to_uint64(key_bits);
   if (verify_des_key(key) == false) {
-    return -1;
+    fprintf(stderr, "Key is invalid.\n");
+    exit(-1);
   }
 
   FILE* input_file = fopen(input_fname, "rb");
   if (input_file == NULL) {
-    return -1;
+    fprintf(stderr, "Unable to open input file %s.\n", input_fname);
+    exit(-1);
   }
   fseek(input_file, 0, SEEK_END);
   long input_len = ftell(input_file);
@@ -96,7 +100,8 @@ int des(int mode, char* key_fname, char* input_fname, char* output_fname) {
 
   FILE* output_file = fopen(output_fname, "wb+");
   if (output_file == NULL) {
-    return -1;
+    fprintf(stderr, "Unable to open ouput file %s.\n", output_fname);
+    exit(-1);
   }
 
   uint64_t subkeys[16] = {0};
