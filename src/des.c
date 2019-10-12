@@ -1,6 +1,5 @@
 #include "des.h"
 #include <stdlib.h>
-#include "bits.h"
 #include "tables.h"
 
 #define L64_MASK 0x00000000ffffffff
@@ -65,6 +64,8 @@ uint64_t calc_sbox(uint64_t data) {
   return ret;
 }
 
+uint64_t des_block(uint64_t chunk, uint64_t key, int mode);
+
 void _des(int mode, uint64_t key, char* read_chunk, char* write_chunk,
           FILE* output_file) {
   uint64_t ret = des_block(to_uint64(read_chunk), key, mode);
@@ -92,7 +93,6 @@ int des(int mode, char* key_fname, char* input_fname, char* output_fname) {
   fseek(input_file, 0, SEEK_END);
   long input_len = ftell(input_file);
   fseek(input_file, 0, SEEK_SET);
-  printf("%s %ld\n", input_fname, input_len);
 
   FILE* output_file = fopen(output_fname, "wb+");
   if (output_file == NULL) {
@@ -118,10 +118,10 @@ int des(int mode, char* key_fname, char* input_fname, char* output_fname) {
 
     if (mode == DECRYPT_MODE && input_len == 8) {
       fread(read_chunk, sizeof(uint8_t), 8, input_file);
-      int times = read_chunk[7] & 0x9;
       uint64_t ret = des_block(to_uint64(read_chunk), key, DECRYPT_MODE);
+      int times = ret & 0x9;
       to_bit(ret, write_chunk);
-      fwrite(write_chunk, sizeof(uint8_t), 8 - times, output_file);
+      fwrite(write_chunk, sizeof(uint8_t), times, output_file);
       break;
     }
   }
@@ -159,21 +159,4 @@ uint64_t des_block(uint64_t chunk, uint64_t key, int mode) {
   uint64_t pre_output = (((uint64_t)R) << 32) | (uint64_t)L;
   uint64_t ret = do_permutation(PI, 64, 64, pre_output);
   return ret;
-}
-
-void validate_des() {
-  int i;
-  uint64_t result = 0xa7f1d92a83c8d9fe;
-  uint64_t key = 0xa7f1d92a83c8d9fe;
-
-  // des(ENCRYPT_MODE, "key", "plain", "encrypted");
-
-  des(DECRYPT_MODE, "key", "encrypted1", "decrypted");
-
-  uint64_t e = des_block(result, key, ENCRYPT_MODE);
-  printf("key: %016llx\n", key);
-  printf("plain: %016llx\n", result);
-  printf("encrypted: %016llx\n", e);
-  printf("%016llX\n", des_block(e, key, DECRYPT_MODE));
-  return;
 }
