@@ -33,7 +33,7 @@ uint64_t do_permutation(const char* perm, int size, int to, uint64_t chunk) {
   return ret;
 }
 
-void calc_subkey(uint64_t key, uint64_t* subkey) {
+void calc_subkeys(uint64_t key, uint64_t* subkeys) {
   key = do_permutation(PERM_REMOVE_PARITY, 64, 56, key);
   uint64_t permuted_choice_1 = do_permutation(PC1, 64, 56, key);
   uint32_t C = (uint32_t)((permuted_choice_1 >> 28) & 0xFFFFFFF);
@@ -44,9 +44,9 @@ void calc_subkey(uint64_t key, uint64_t* subkey) {
       D = (0x0fffffff & (D << 1)) | (0x00000001 & (D >> 27));
     }
     uint64_t permuted_choice_2 = (((uint64_t)C) << 28) | (uint64_t)D;
-    subkey[i] = 0;
+    subkeys[i] = 0;
     for (int j = 0; j < 48; ++j) {
-      subkey[i] = (subkey[i] << 1) | ((permuted_choice_2 >> (56 - PC2[j])) & 1);
+      subkeys[i] = (subkeys[i] << 1) | ((permuted_choice_2 >> (56 - PC2[j])) & 1);
     }
   }
 }
@@ -64,11 +64,11 @@ uint64_t calc_sbox(uint64_t data) {
   return ret;
 }
 
-uint64_t des_block(uint64_t chunk, uint64_t key, int mode);
+uint64_t des_block(uint64_t chunk, uint64_t* subkeys, int mode);
 
-void _des(int mode, uint64_t key, char* read_chunk, char* write_chunk,
+void _des(int mode, uint64_t* subkeys, char* read_chunk, char* write_chunk,
           FILE* output_file) {
-  uint64_t ret = des_block(to_uint64(read_chunk), key, mode);
+  uint64_t ret = des_block(to_uint64(read_chunk), subkeys, mode);
   to_bit(ret, write_chunk);
   fwrite(write_chunk, sizeof(uint8_t), 8, output_file);
 }
@@ -99,26 +99,29 @@ int des(int mode, char* key_fname, char* input_fname, char* output_fname) {
     return -1;
   }
 
+  uint64_t subkeys[16] = {0};
+  calc_subkeys(key, subkeys);
+
   char read_chunk[8];
   char write_chunk[8];
   size_t read_chunk_len;
   while ((read_chunk_len = fread(read_chunk, sizeof(uint8_t), 8, input_file))) {
     input_len -= read_chunk_len;
 
-    _des(mode, key, read_chunk, write_chunk, output_file);
+    _des(mode, subkeys, read_chunk, write_chunk, output_file);
 
     if (mode == ENCRYPT_MODE && input_len < 8) {
       fread(read_chunk, sizeof(uint8_t), 8, input_file);
       for (int i = input_len; i < 8; i++) {
         read_chunk[i] = input_len;
       }
-      _des(ENCRYPT_MODE, key, read_chunk, write_chunk, output_file);
+      _des(ENCRYPT_MODE, subkeys, read_chunk, write_chunk, output_file);
       break;
     }
 
     if (mode == DECRYPT_MODE && input_len == 8) {
       fread(read_chunk, sizeof(uint8_t), 8, input_file);
-      uint64_t ret = des_block(to_uint64(read_chunk), key, DECRYPT_MODE);
+      uint64_t ret = des_block(to_uint64(read_chunk), subkeys, DECRYPT_MODE);
       int times = ret & 0x9;
       to_bit(ret, write_chunk);
       fwrite(write_chunk, sizeof(uint8_t), times, output_file);
@@ -131,21 +134,18 @@ int des(int mode, char* key_fname, char* input_fname, char* output_fname) {
   return 1;
 }
 
-uint64_t des_block(uint64_t chunk, uint64_t key, int mode) {
+uint64_t des_block(uint64_t chunk, uint64_t* subkeys, int mode) {
   uint64_t init_perm_res = do_permutation(IP, 64, 64, chunk);
   uint32_t L = (uint32_t)(init_perm_res >> 32) & L64_MASK;
   uint32_t R = (uint32_t)init_perm_res & L64_MASK;
-
-  uint64_t subkey[16] = {0};
-  calc_subkey(key, subkey);
 
   for (int i = 0; i < 16; ++i) {
     uint64_t sbox_input = do_permutation(E, 32, 48, R);
 
     if (mode == DECRYPT_MODE) {
-      sbox_input ^= subkey[15 - i];
+      sbox_input ^= subkeys[15 - i];
     } else {
-      sbox_input ^= subkey[i];
+      sbox_input ^= subkeys[i];
     }
 
     uint64_t sbox_output = calc_sbox(sbox_input);
