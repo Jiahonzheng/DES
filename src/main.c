@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "des.h"
 
 void help(int argc, char** argv);
@@ -22,6 +23,8 @@ void help(int argc, char** argv) {
 }
 
 void keygen(int argc, char** argv) {
+  // 设置随机数生成种子
+  srand((unsigned)time(NULL));
   FILE* output_file = fopen(argv[2], "wb+");
   if (output_file == NULL) {
     fprintf(stderr, "Cannot open output file.\n");
