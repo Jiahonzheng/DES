@@ -25,25 +25,32 @@ bool verify_des_key(uint64_t key) {
   return true;
 }
 
-uint64_t do_permutation(const char* perm, int size, int to, uint64_t chunk) {
+// 置换
+// 对 in 位的 data 数据根据 perm 置换出 out 位数据
+uint64_t do_permutation(const char* perm, int in, int out, uint64_t data) {
   uint64_t ret = 0;
-  for (int i = 0; i < to; i++) {
-    ret = (ret << 1) | ((chunk >> (size - perm[i])) & 1);
+  for (int i = 0; i < out; i++) {
+    ret = (ret << 1) | ((data >> (in - perm[i])) & 1);
   }
   return ret;
 }
 
+// 计算子密钥
 void calc_subkeys(uint64_t key, uint64_t* subkeys) {
+  // 进行 PC1 置换
   uint64_t permuted_choice_1 = do_permutation(PC1, 64, 56, key);
   uint32_t C = (uint32_t)((permuted_choice_1 >> 28) & 0xFFFFFFF);
   uint32_t D = (uint32_t)(permuted_choice_1 & 0xFFFFFFF);
   for (int i = 0; i < 16; ++i) {
+    // 循环左移
     for (int j = 0; j < iteration_shift[i]; ++j) {
       C = (0x0fffffff & (C << 1)) | (0x00000001 & (C >> 27));
       D = (0x0fffffff & (D << 1)) | (0x00000001 & (D >> 27));
     }
+    // 合并 C 和 D 得到 56 位数据
     uint64_t permuted_choice_2 = (((uint64_t)C) << 28) | (uint64_t)D;
     subkeys[i] = 0;
+    // 进行 PC2 置换
     for (int j = 0; j < 48; ++j) {
       subkeys[i] =
           (subkeys[i] << 1) | ((permuted_choice_2 >> (56 - PC2[j])) & 1);
@@ -51,14 +58,19 @@ void calc_subkeys(uint64_t key, uint64_t* subkeys) {
   }
 }
 
+// 进行 S-盒替代
 uint64_t calc_sbox(uint64_t data) {
   uint64_t ret = 0;
   for (int i = 0; i < 8; ++i) {
-    char row = (char)((data & (0x0000840000000000 >> (6 * i))) >> (42 - 6 * i));
+    // 计算 S 表对应的行
+    uint8_t row =
+        (uint8_t)((data & (0x0000840000000000 >> (6 * i))) >> (42 - 6 * i));
     row = (row >> 4) | (row & 1);
-    char column =
-        (char)((data & (0x0000780000000000 >> (6 * i))) >> (43 - 6 * i));
-
+    // 计算 S 表对应的列
+    uint8_t column =
+        (uint8_t)((data & (0x0000780000000000 >> (6 * i))) >> (43 - 6 * i));
+    // 对于每个 6 位的块，通过 S 表产生 4 位的输出
+    // 将 8 个 4 位输出合并为 32 位数据
     ret = (ret << 4) | (uint32_t)(S[i][16 * row + column] & 0xF);
   }
   return ret;
@@ -138,29 +150,37 @@ int des(int mode, char* key_fname, char* input_fname, char* output_fname) {
   return 1;
 }
 
+// 对 64 位数据进行 DES 加密或解密
 uint64_t des_block(uint64_t chunk, uint64_t* subkeys, int mode) {
+  // 进行初始置换
   uint64_t init_perm_res = do_permutation(IP, 64, 64, chunk);
+  // 获取初始的 L
   uint32_t L = (uint32_t)(init_perm_res >> 32) & L64_MASK;
+  // 获取初始的 R
   uint32_t R = (uint32_t)init_perm_res & L64_MASK;
-
+  // 进行 16 轮迭代
   for (int i = 0; i < 16; ++i) {
+    // 进行 Feistel 函数计算
+    // 进行 E 扩展置换
     uint64_t sbox_input = do_permutation(E, 32, 48, R);
-
+    // 将扩展后的 48 位数据与 48 位子密钥进行异或运算
     if (mode == DECRYPT_MODE) {
       sbox_input ^= subkeys[15 - i];
     } else {
       sbox_input ^= subkeys[i];
     }
-
+    // 进行 S-盒替代
     uint64_t sbox_output = calc_sbox(sbox_input);
+    // 进行 P 盒置换
     uint64_t feistel_ret = do_permutation(P, 32, 32, sbox_output);
-
+    // 计算下一轮所需要的 L 和 R
     uint32_t temp = R;
     R = L ^ feistel_ret;
     L = temp;
   }
-
+  // 交换 L 和 R
   uint64_t pre_output = (((uint64_t)R) << 32) | (uint64_t)L;
+  // 进行逆置换
   uint64_t ret = do_permutation(PI, 64, 64, pre_output);
   return ret;
 }

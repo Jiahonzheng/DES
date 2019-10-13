@@ -16,7 +16,7 @@ extern const char iteration_shift[];
 // E-扩展置换
 extern const char E[];
 
-// S-盒置换
+// S-盒替代
 extern const char S[8][64];
 
 // P-盒置换
