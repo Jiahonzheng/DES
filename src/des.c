@@ -116,30 +116,33 @@ int des(int mode, char* key_fname, char* input_fname, char* output_fname) {
   }
 
   uint64_t subkeys[16] = {0};
+  // 计算 16 个 48 位子密钥
   calc_subkeys(key, subkeys);
-
   char read_chunk[8];
   char write_chunk[8];
   size_t read_chunk_len;
   while ((read_chunk_len = fread(read_chunk, sizeof(uint8_t), 8, input_file))) {
+    // 每读取 8 个字节，对 input_len 进行更新，其初始值为输入文件的大小
     input_len -= read_chunk_len;
-
+    // 对每 64 位数据进行加密或解密
     _des(mode, subkeys, read_chunk, write_chunk, output_file);
-
+    // 加密时，最后分组的字节填充
     if (mode == ENCRYPT_MODE && input_len < 8) {
       fread(read_chunk, sizeof(uint8_t), 8, input_file);
+      // 填充 input_len 个字节
       for (int i = input_len; i < 8; i++) {
         read_chunk[i] = input_len;
       }
       _des(ENCRYPT_MODE, subkeys, read_chunk, write_chunk, output_file);
       break;
     }
-
+    // 解密时，最后分组的字节截断
     if (mode == DECRYPT_MODE && input_len == 8) {
       fread(read_chunk, sizeof(uint8_t), 8, input_file);
       uint64_t ret = des_block(to_uint64(read_chunk), subkeys, DECRYPT_MODE);
       int times = ret & 0x7;
       to_bit(ret, write_chunk);
+      // 截断 times 个字节
       fwrite(write_chunk, sizeof(uint8_t), times, output_file);
       break;
     }
