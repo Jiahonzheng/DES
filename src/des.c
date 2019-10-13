@@ -138,7 +138,7 @@ int des(int mode, char* key_fname, char* input_fname, char* output_fname) {
     if (mode == DECRYPT_MODE && input_len == 8) {
       fread(read_chunk, sizeof(uint8_t), 8, input_file);
       uint64_t ret = des_block(to_uint64(read_chunk), subkeys, DECRYPT_MODE);
-      int times = ret & 0x9;
+      int times = ret & 0x7;
       to_bit(ret, write_chunk);
       fwrite(write_chunk, sizeof(uint8_t), times, output_file);
       break;
