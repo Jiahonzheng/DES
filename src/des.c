@@ -34,7 +34,6 @@ uint64_t do_permutation(const char* perm, int size, int to, uint64_t chunk) {
 }
 
 void calc_subkeys(uint64_t key, uint64_t* subkeys) {
-  key = do_permutation(PERM_REMOVE_PARITY, 64, 56, key);
   uint64_t permuted_choice_1 = do_permutation(PC1, 64, 56, key);
   uint32_t C = (uint32_t)((permuted_choice_1 >> 28) & 0xFFFFFFF);
   uint32_t D = (uint32_t)(permuted_choice_1 & 0xFFFFFFF);

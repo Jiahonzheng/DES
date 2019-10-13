@@ -10,9 +10,6 @@ extern const char PC1[];
 // PC-2 置换
 extern const char PC2[];
 
-// 去除奇偶位
-extern const char PERM_REMOVE_PARITY[];
-
 // 移动位数
 extern const char iteration_shift[];
 
