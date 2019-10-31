@@ -40,7 +40,7 @@ uint64_t do_permutation(const char* perm, int in, int out, uint64_t data) {
 
 ### 生成子密钥
 
-DES 加密共执行16次迭代，每次迭代过程的数据长度为 48 位，因此我们需要生成 16 个 48 位的子密钥。首先，我们将 $M'$ 根据 PC1 置换表进行置换，变成 56 位密钥，PC1 置换表如下。
+DES 加密共执行16次迭代，每次迭代过程的数据长度为 48 位，因此我们需要生成 16 个 48 位的子密钥。首先，我们将 $K$ 根据 PC1 置换表进行置换，变成 56 位密钥，PC1 置换表如下。
 
 ```c++
 // PC-1 置换
@@ -171,7 +171,7 @@ uint64_t feistel_ret = do_permutation(P, 32, 32, sbox_output);
 
 $$
 L_i = R_{i-1}  \\
-R_i = L_i \oplus Feistel(R_{i_1}, K_i)
+R_i = L_{i-1} \oplus Feistel(R_{i-1}, K_i)
 $$
 
 
